@@ -1,0 +1,208 @@
+from numpy.random import randn
+import os
+import random
+import numpy as np
+import time
+from pandas.plotting import autocorrelation_plot
+
+turbTimeSeries = pd.read_csv("C:\Users\user\AppData\Roaming/lStM\turbData.csv")
+df_sel = turbTimeSeries[['unNamEd: 0','actPower','windSpeed']]
+df_inp = df_sel[['actPower', 'windSpeed']]
+rng = pd.date_range('2020-12-31', periods=8760, freq='H')
+time_df = pd.DataFrame(rng)
+df_inp = df_inp.fillna(0).astype(float)
+df_inp = pd.concat((time_df, df_inp), axis=1)
+df_inp = df_inp.set_index(0)
+df_inp = df_inp.loc['2020-12-17':]
+# df_inp.head()
+
+
+# NaN VALUES
+
+df_inp.isna().sum()
+predictions = []
+
+X = df_inp['actPower'].values
+train, test = X[0:-144], X[-144:]
+history = [i for i in train]
+
+for i in range(len(test)):
+	predictions.append(history[-144])
+	history.append(test[i])
+rmse = sqrt(mean_squared_error(test, predictions))
+
+# line plot of observed vs predicted
+# plt.figure(figsize=(15, 8))
+# plt.title('προβλεπόμενο / πραγματικό βασικό')
+# plt.plot(test, color='C0', marker='o', label='πραγ')
+# plt.plot(predictions, color='C1', marker='o', label='προβ')
+# plt.legend()
+# plt.savefig('ex_.png')
+# plt.show()
+
+
+def fore_acc(forecast, actualValue):
+    forecast = np.array(forecast)
+    actualValue = np.array(actualValue)
+    mape = np.mean(np.abs(forecast - actualValue)/np.abs(actualValue)) 
+    M_E_i = np.mean(forecast - actualValue)            
+    MAE = np.mean(np.abs(forecast - actualValue))   
+    MPE_ES = np.mean((forecast - actualValue)/actualValue)   
+    rmse = np.mean((forecast - actualValue)**2)**.5  
+    corr_ = np.corrcoef(forecast, actualValue)[0,1]   
+    
+    minS = np.amin(np.hstack([forecast[:,None], 
+                              actualValue[:,None]]), axis=1)
+    maxS = np.amax(np.hstack([forecast[:,None], 
+                              actualValue[:,None]]), axis=1)
+    minMax = 1 - np.mean(minS/maxS)       
+    
+    return({'MAPE is':mape, 'ME is':M_E_i, 'MAE is': MAE, 
+            'MPE is': MPE_ES, 'RSME is':rmse, 
+            'Corr is':corr_, 'MINMAX is':minMax})
+
+tVal = pd.DataFrame(test)
+cPred = pd.DataFrame(predictions)
+fore_acc(cPred, tVal)
+
+
+
+def xyCreate(ts: np.array, lag=1, n_ahead=1, target_index=0):
+ 
+    n_features = ts.shape[1]
+    X, Y = [], []
+    if len(ts) - lag <= 0:
+        X.append(ts)
+    else:
+        for i in range(len(ts) - lag - n_ahead):
+            Y.append(ts[(i + lag):(i + lag + n_ahead), target_index])
+            X.append(ts[i:(i + lag)])
+    X, Y = np.array(X), np.array(Y)
+    X = np.reshape(X, (X.shape[0], lag, n_features))
+    return X, Y
+
+
+
+lag = 360
+n_ahead = 144
+train_share = 0.8
+epochs = 20
+batch_size = 512
+lr = 0.001
+feat_fin = ['actPower','windSpeed']
+
+ts = df_inp[feat_fin]
+
+
+## STANDARD!
+scaler = MinMaxScaler()
+scaler.fit(ts)
+ts_scaled = scaler.transform(ts)
+
+X, Y = xyCreate(ts_scaled, lag=lag, n_ahead=n_ahead)
+
+
+
+Xtrain, Ytrain = X[0:int(X.shape[0] * train_share)], Y[0:int(X.shape[0] * train_share)]
+Xtest, Ytest = X[int(X.shape[0] * train_share):], Y[int(X.shape[0] * train_share):]
+model = tf.keras.Sequential()
+model.add(tf.keras.layers.LSTM(16, activation='relu', return_sequences=False))
+model.add(tf.keras.layers.Dense(144))
+ear_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=2, min_delta=0.001)
+model.compile(optimizer = tf.keras.optimizers.Adam(learning_rate=0.001), loss='mae', metrics='mae')
+history = model.fit(Xtrain, Ytrain,epochs=epochs, validation_data=(Xtest, Ytest), shuffle=False, callbacks=[early_stopping])
+# plt.plot(history.history['loss'], label='trainLoss')
+# plt.plot(history.history['val_loss'], label = 'validLoss')
+# plt.legend()
+
+
+
+
+basedTestData = model.predict(Xtest)
+
+
+tot_days = time_df.values[-len(basedTestData):-len(basedTestData) + n_ahead]
+days_df = pd.DataFrame(tot_days)
+
+
+pred_n_ahead = pd.DataFrame(basedTestData[0])
+actual_n_ahead = pd.DataFrame(Ytest[0])
+pr_p = pd.concat([pred_n_ahead]*2, axis=1)
+ac_p = pd.concat([actual_n_ahead]*2, axis=1)
+pr_p = pd.DataFrame(scaler.inverse_transform(pr_p))
+ac_p = pd.DataFrame(scaler.inverse_transform(ac_p))
+
+# pr_p = pr_p.rename(columns={0:'PredPower'})
+# ac_p = ac_p.rename(columns={0:'actPower'})
+# df_final = pd.concat([days_df, pr_p['predPower'], ac_p['actPower']], axis=1).set_index(0)
+
+# plt.figure(figsize=(15, 8))
+# plt.plot(df_final.index, df_final.actPower, color='C0', marker='o', label='πραγ')
+# plt.plot(df_final.index, df_final.predPower, color='C1', marker='o', label='προβ', alpha=0.6)
+# plt.title('Προβλεπόμενη vs Πραγματική')
+# plt.gcf().axes[0].yaxis.get_major_formatter().set_scientific(False)
+# plt.legend()
+# plt.savefig('foreExample.png')
+# plt.show
+
+
+
+
+
+
+forecast_accuracy(df_final['predPower'], df_final['actPower'], )
+
+df_final['res'] =  df_final['predPower'] - df_final['actPower']
+df_final['res'].describe()
+
+
+df_final['res'].hist(color = ('b'))
+# plt.title('Υπολοιπόμενο/Ιστόγραμμα')
+# plt.xlabel('bins')
+# plt.ylabel('countOcc')
+
+kindPlot = "kde"
+df_final['res'].plot(kind=kindPlot)
+
+
+
+autocorrelation_plot(df_final['Residuals'])
+# plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
