@@ -31,7 +31,7 @@ for i in range(len(test)):
 	history.append(test[i])
 rmse = sqrt(mean_squared_error(test, predictions))
 
-# line plot of observed vs predicted
+
 # plt.figure(figsize=(15, 8))
 # plt.title('προβλεπόμενο / πραγματικό βασικό')
 # plt.plot(test, color='C0', marker='o', label='πραγ')
@@ -142,7 +142,7 @@ ac_p = pd.DataFrame(scaler.inverse_transform(ac_p))
 # plt.title('Προβλεπόμενη vs Πραγματική')
 # plt.gcf().axes[0].yaxis.get_major_formatter().set_scientific(False)
 # plt.legend()
-# plt.savefig('foreExample.png')
+# plt.savefig('pardeigma.png')
 # plt.show
 
 
