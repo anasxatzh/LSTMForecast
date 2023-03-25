@@ -171,38 +171,3 @@ autocorrelation_plot(df_final['Residuals'])
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
